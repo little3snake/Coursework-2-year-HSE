@@ -5,6 +5,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from collections import namedtuple, deque
 from itertools import count
+from torch.utils.tensorboard import SummaryWriter
 
 import torch # also for automatic differentiation (torch.autograd)
 import torch.nn as nn #neural networks
@@ -12,16 +13,6 @@ import torch.optim as optim #optimization
 import torch.nn.functional as F
 # create environment
 env = gym.make("CartPole-v1")
-
-# set up matplotlib
-# check is everything work for GUI
-# If this is the case, then the graphs will be embedded
-# in the cells (this usually happens in Jupiter Notebook)
-is_ipython = 'inline' in matplotlib.get_backend()
-if is_ipython:
-    from IPython import display
-#enables interactive graph rendering mode in matplotlib.
-plt.ion()
 
 # if GPU is to be used
 # mps is Multy-Process Service (NVIDIA)
@@ -31,6 +22,7 @@ device = torch.device(
     "cpu"
 )
 
+writer = SummaryWriter('runs/CartPole-v1')
 
 # create simplified immutable objects (similar to structures) with named fields
 Transition = namedtuple('Transition',
@@ -70,7 +62,7 @@ class DQN(nn.Module):
         x = F.relu(self.layer2(x))
         return self.layer3(x) # a vector of size n_actions, where each value is the Q—value for the corresponding action.
 
-
+# Hyperparameters
 BATCH_SIZE = 128 # BATCH_SIZE is the number of transitions sampled from the replay buffer
 GAMMA = 0.99 # GAMMA is the discount factor as mentioned in the previous section
 EPS_START = 0.9 # EPS_START is the starting value of epsilon
@@ -119,48 +111,7 @@ def select_action(state):
 
 episode_durations = []
 
-# for graphic
-def plot_durations(show_result=False):
-    plt.figure(1)
-    durations_t = torch.tensor(episode_durations, dtype=torch.float)
-    if show_result:
-        # if the cart has trained
-        plt.title('Result')
-    else:
-        plt.clf() #clean the graphic
-        plt.title('Training...')
-    plt.xlabel('Episode')
-    plt.ylabel('Duration')
-    plt.plot(durations_t.numpy())
-    # Take 100 episode averages and plot them too
-    if len(durations_t) >= 100:
-        #.unfold(0,100,1) create windows (in which 100 elem
-        # [100 elem] [100 elem] [100 elem] ...
-        #mean(1) calculate the mean (of 2nd elem in info) of each window
-        # view(-1) change elem to 1-dim tensor
-        means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
-        # split tensors: [0, 0, 0, 0 ... 0, mean]
-        means = torch.cat((torch.zeros(99), means))
-        # add to graphic
-        plt.plot(means.numpy())
-
-    plt.pause(0.001)  # pause a bit so that plots are updated
-    if is_ipython: #for JupiterNotebook and more interactive drawing
-        # The show_result variable controls the stage of executing
-        # if it is False, it means that the program is still learning
-        # and the schedule needs to be updated regularly.
-        if not show_result: #draw graphic after each episode
-            # get current figure and draw it in Jupiter cell
-            display.display(plt.gcf())
-            #ckear ex data
-            # wait for smooth drawing
-            display.clear_output(wait=True)
-        else:
-            #drawing final graphic
-            # it isn't deleted and stay after program end.
-            display.display(plt.gcf())
-
-
+loss_counter = 0
 # training
 def optimize_model():
     # if there aren't enough memory
@@ -221,7 +172,8 @@ def optimize_model():
     torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
     optimizer.step()
 
-
+    # to Tensorboard
+    writer.add_scalar('loss', loss.item(), steps_done)
 
 
 if torch.cuda.is_available() or torch.backends.mps.is_available():
@@ -233,9 +185,11 @@ for i_episode in range(num_episodes):
     # Initialize the environment and get its state
     state, info = env.reset()
     state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0) # [...] -row
+    total_reward = 0
     for t in count():
         action = select_action(state)
         observation, reward, terminated, truncated, _ = env.step(action.item())
+        total_reward += reward
         reward = torch.tensor([reward], device=device)
         done = terminated or truncated
 
@@ -263,10 +217,11 @@ for i_episode in range(num_episodes):
 
         if done:
             episode_durations.append(t + 1)
-            plot_durations()
+            writer.add_scalar('Episode reward', total_reward, i_episode)
+            writer.add_scalar('Episode duration', t+1, i_episode)
+            writer.add_scalar('Epsilon', EPS_END + (EPS_START - EPS_END) * math.exp(-1. * steps_done / EPS_DECAY), i_episode)
             break
 
-print('Complete')
-plot_durations(show_result=True)
-plt.ioff()
-plt.show()
+writer.close()
+print('Training complete')
+
