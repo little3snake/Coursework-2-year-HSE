@@ -35,7 +35,6 @@ class ReplayMemory(object):
         self.memory = deque([], maxlen=capacity) # two-way queue with maximum length "capacity"
 
     def push(self, *args):
-        """Save a transition"""
         self.memory.append(Transition(*args))
 
     def sample(self, batch_size):
