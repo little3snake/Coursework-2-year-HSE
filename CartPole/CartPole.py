@@ -175,7 +175,7 @@ def optimize_model():
     # to Tensorboard
     writer.add_scalar('loss', loss.item(), steps_done)
 
-def save_frames_as_gif(frames, path='./', filename='gym_animation.gif'):
+def save_frames_as_gif(frames, path='./', filename='cart_pole.gif'):
 
     #Need change the size
     plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), dpi=72)
