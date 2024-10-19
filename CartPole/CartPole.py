@@ -6,13 +6,14 @@ import matplotlib.pyplot as plt
 from collections import namedtuple, deque
 from itertools import count
 from torch.utils.tensorboard import SummaryWriter
+from matplotlib import animation 
 
 import torch # also for automatic differentiation (torch.autograd)
 import torch.nn as nn #neural networks
 import torch.optim as optim #optimization
 import torch.nn.functional as F
 # create environment
-env = gym.make("CartPole-v1")
+env = gym.make("CartPole-v1", render_mode="rgb_array")
 
 # if GPU is to be used
 # mps is Multy-Process Service (NVIDIA)
@@ -174,11 +175,27 @@ def optimize_model():
     # to Tensorboard
     writer.add_scalar('loss', loss.item(), steps_done)
 
+def save_frames_as_gif(frames, path='./', filename='gym_animation.gif'):
+
+    #Need change the size
+    plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), dpi=72)
+
+    patch = plt.imshow(frames[0])
+    plt.axis('off')
+
+    def animate(i):
+        patch.set_data(frames[i])
+
+    anim = animation.FuncAnimation(plt.gcf(), animate, frames = len(frames), interval=50)
+    anim.save(path + filename, writer='imagemagick', fps=60)
+
 
 if torch.cuda.is_available() or torch.backends.mps.is_available():
     num_episodes = 600
 else:
     num_episodes = 50
+
+frames = [] # for .gif
 
 for i_episode in range(num_episodes):
     # Initialize the environment and get its state
@@ -186,6 +203,8 @@ for i_episode in range(num_episodes):
     state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0) # [...] -row
     total_reward = 0
     for t in count():
+        if (i_episode == num_episodes - 1):
+            frames.append(env.render())
         action = select_action(state)
         observation, reward, terminated, truncated, _ = env.step(action.item())
         total_reward += reward
@@ -222,5 +241,6 @@ for i_episode in range(num_episodes):
             break
 
 writer.close()
+env.close()
+save_frames_as_gif(frames)
 print('Training complete')
-
