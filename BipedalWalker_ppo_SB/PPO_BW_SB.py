@@ -12,7 +12,9 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from torch.utils.tensorboard import SummaryWriter
 from stable_baselines3.common.results_plotter import ts2xy, load_results
 
-log_dir = "./ppo_bipedal_walker_logs"
+from TimingCallback import TimingCallback
+
+log_dir = r"C:\Users\user\Python ML\PyTorch\BipedalWalker_ppo_PTorch\logs_ppo\ppo_sb_bipedal_walker_logs" # change directory name
 os.makedirs(log_dir, exist_ok=True)
 video_dir = "./gif"
 os.makedirs(video_dir, exist_ok=True)
@@ -24,6 +26,7 @@ env_name = "BipedalWalker-v3"
 env = gym.make(env_name)
 env = Monitor(env, log_dir)
 env = DummyVecEnv([lambda: env])
+timing_callback = TimingCallback(log_interval=10000, verbose=1) #  -- timing callback
 callback = EvalCallback(env, log_path=log_dir, deterministic=True)
 
 policy_kwargs = dict( ortho_init=False, activation_fn=torch.nn.ReLU,
@@ -75,10 +78,12 @@ def record_episode_gif(env, model, filename):
     print(f"Total reward for {filename}: {total_reward}")
 
 #pretraining
-record_episode_gif(gym.make(env_name, render_mode="rgb_array"), model, f"{env_name}_pretraining.gif")
+#record_episode_gif(gym.make(env_name, render_mode="rgb_array"), model, f"{env_name}_pretraining.gif")
 
-total_timesteps = 500000
-model.learn(total_timesteps=total_timesteps, log_interval=10, callback=callback)
+total_timesteps = 500_000 # 500_000
+model.learn(total_timesteps=total_timesteps,
+            log_interval=10,
+            callback=[callback, timing_callback])
 
 # logs to tensorboard
 from stable_baselines3.common.results_plotter import ts2xy, load_results
