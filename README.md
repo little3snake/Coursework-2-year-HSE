@@ -1,4 +1,5 @@
 # Coursework-2-year-HSE
+A part of the coursework with PPO implementations: https://github.com/little3snake/RL_PPO_algorithm/tree/main
 ## Folders:
 #### CartPole
 Environment:CartPole-v1
